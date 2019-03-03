@@ -8,7 +8,7 @@ import zipfile, shutil
 ARGS_LEN = 3
 IP_PATTERN = r'^((1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})\.){3}(1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})$'
 SERVER_PORT = 1337
-CHUNK_SIZE = 241044784
+CHUNK_SIZE = 65536
 
 def validate_args():
     '''
