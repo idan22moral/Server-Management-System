@@ -8,7 +8,7 @@ import zipfile, shutil
 ARGS_LEN = 3
 IP_PATTERN = r'^((1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})\.){3}(1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})$'
 SERVER_PORT = 1337
-CHUNK_SIZE = 1024
+CHUNK_SIZE = 241044784
 
 def validate_args():
     '''
@@ -67,7 +67,7 @@ def folder_to_json(folder_path):
     folder_path = os.path.abspath(folder_path)
     
     # Initialize the folder dictionary
-    folder_json = {'type' : 'folder', 'name' : folder_path.split('/')[-1]}
+    folder_json = {'type' : 'folder', 'name' : os.path.basename(folder_path)}
     folder_json['entries'] = []
     
     # For each entry in the current folder
@@ -133,9 +133,9 @@ def main():
         
         # Rename the folder while the name is already taken
         while connection_socket.recv(CHUNK_SIZE) == b'RENAME':
-            print('Website name "%s" already taken.' % (website_folder_json['name']))
+            print('Website name "%s" already taken.' % (os.path.basename(website_folder_json['name'])))
             new_name = input('Enter new name: ')
-            website_folder_json['name'] = new_name
+            website_folder_json['name'] = os.path.join(os.path.dirname(website_folder_json['name']), new_name)
             connection_socket.send(b'NEWNAME:' + new_name.encode())
         print('Done.')
     else:

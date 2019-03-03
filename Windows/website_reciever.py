@@ -4,7 +4,7 @@ import pickle
 import os
 
 LISTEN_PORT = 1337
-CHUNK_SIZE = 1024
+CHUNK_SIZE = 241044784
 
 client_threads = []
 
@@ -44,10 +44,10 @@ def json_to_folder(folder_json, relative_path=''):
     '''
 
     # Prepare the relative_path for a recursive call or a entry saving
-    relative_path += folder_json['name'] + '/'
+    relative_path += os.path.basename(folder_json['name']) + '/'
 
     # Create directory for the folder
-    print('Creating dir...')
+    print('%s: Creating...' % (relative_path))
     try:
         os.mkdir(relative_path)
     except:
@@ -57,7 +57,7 @@ def json_to_folder(folder_json, relative_path=''):
     # Wait until the system creates the folder        
     while not os.path.exists(relative_path):
         pass
-    print('Dir Created!')
+    print('%s: Created!' % (relative_path))
 
     # For each entry in the folder's entry-list
     for entry in folder_json['entries']:
@@ -100,7 +100,7 @@ def handle_client(client_socket, client_addr):
     while json_to_folder(website_folder_json) == 'RENAME':
         client_socket.send(b'RENAME')
         new_name = client_socket.recv(CHUNK_SIZE).decode().split(':')[1]
-        website_folder_json['name'] = new_name
+        website_folder_json['name'] = os.path.basename(new_name)
     
     # End the client serving
     client_socket.send(b'DONE')
@@ -109,7 +109,8 @@ def handle_client(client_socket, client_addr):
 def main():
     # Initialize the listening socket and start listening for clients
     listening_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listening_socket.bind(('localhost', LISTEN_PORT))
+    local_ip_address = socket.gethostbyname(socket.gethostname())
+    listening_socket.bind((local_ip_address, LISTEN_PORT))
     listening_socket.listen()
     print('Listening for clients on port %d...' % (LISTEN_PORT))
     
