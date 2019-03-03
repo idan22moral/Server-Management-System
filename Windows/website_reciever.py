@@ -4,7 +4,7 @@ import pickle
 import os
 
 LISTEN_PORT = 1337
-CHUNK_SIZE = 241044784
+CHUNK_SIZE = 65536
 
 client_threads = []
 
