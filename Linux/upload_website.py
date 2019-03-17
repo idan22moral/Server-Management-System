@@ -4,9 +4,13 @@ import os, os
 import socket
 import json, pickle
 import zipfile, shutil
-import pyDes
+from Cryptodome.Cipher import DES
+from Cryptodome.Util.Padding import pad
 
 DES_ENCRYPTION_KEY = "l$N6Vq6N"
+DES_BLOCKSIZE = 8
+DES_IV = "r&dVM1Z8"
+
 ARGS_LEN = 3
 IP_PATTERN = r'^((1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})\.){3}(1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})$'
 SERVER_PORT = 1337
@@ -96,18 +100,19 @@ def send_data_in_chunks(sock, data, chunk_size):
     '''
     This function sends the given data in chunks of size chunk_size using the given socket.
     '''
-    data_length = len(data)
+    
+    # Encrypt the data
+    encrypted_data = encrypt_data(data_to_send)
+    data_length = len(encrypted_data)
     
     print('Data length: %d' % (data_length))
 
     # Run through the data list and jump chunk_size elements every time
-    # Then encrypt the current chunk and send it
     # Stop when you get to the last chunk, then send the rest of the bytes
     for i in range(0, chunk_size * (data_length // chunk_size) + 1, chunk_size):
         data_to_send = data[i:i + chunk_size]
-        encrypted_data = encrypt_data(data_to_send)
-        sock.send(encrypted_data)
-        print(f"Sent: {len(encrypted_data) ,data_to_send[-5:-1]}")
+        sock.send(data_to_send)
+        print(f"Sent: {len(data_to_send)}")
 
 
 def encrypt_data(data):
@@ -119,13 +124,13 @@ def encrypt_data(data):
     # Create an instance of a DES object that let's us encrypt our data
     # key - The encryption key. Random string hard-coded at the top of the code.
     #       Note: The same key must be used in the decrypting endpoint, and the key's length must be 8.
-    # pad - The padding byte to add to the end of the data.
-    #       Note: According to the protocol of DES, the length of the data must be a multiple of 8.
-    des_encryptor = pyDes.des(key=DES_ENCRYPTION_KEY, pad=b'\0')
-
+    # IV - The initial value for the encryption.
+    #       Note: The same IV must be used in the decrypting endpoint, and the IV's length must be 8.
+    des_encryptor = DES.new(DES_ENCRYPTION_KEY, DES.MODE_CBC, DES_IV)
+    
+    # Pad the data to be in length of a multiple of the DES_BLOCKSIZE
     # Encrypt the given data, then return it
-    return des_encryptor.encrypt(data)
-
+    return des_encryptor.encrypt(pad(data, DES_BLOCKSIZE))
 
 def main():
     print("started")

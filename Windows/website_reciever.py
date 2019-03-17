@@ -2,9 +2,12 @@ import socket
 import threading
 import pickle
 import os
-import pyDes
+from Cryptodome.Cipher import DES 
 
 DES_ENCRYPTION_KEY = "l$N6Vq6N"
+DES_BLOCKSIZE = 8
+DES_IV = "r&dVM1Z8"
+
 LISTEN_PORT = 1337
 CHUNK_SIZE = 16384
 GOOGLE_DNS_IP = "8.8.8.8"
@@ -18,13 +21,14 @@ def recv_data_in_chunks(sock, total_size, chunk_size):
     '''
     data = b''
 
-    # Recieve the data pieces, decrypt them, and join them together
+    # Recieve the data pieces and join them together
     while len(data) < total_size:
         new_data = sock.recv(chunk_size)
-        decrypted_data = decrypt_data(new_data)
-        print(f"Recieved {len(new_data), decrypted_data[-5:-1]}")
-        data = data + decrypted_data
-    return data
+        print(f"Recieved {len(new_data)}")
+        data = data + new_data
+    
+    # Return the decrypted data
+    return decrypt_data(new_data)
 
 
 def json_to_folder(folder_json, relative_path=''):
