@@ -4,11 +4,18 @@ import os, os
 import socket
 import json, pickle
 import zipfile, shutil
+from Cryptodome.Cipher import AES
+from Cryptodome.Util.Padding import pad
+
+AES_ENCRYPTION_KEY = b"N44vCTcb<W8sBXD@"
+AES_BLOCKSIZE = 16
+AES_IV = b"PoTFg9ZlV?g(bH8Z"
 
 ARGS_LEN = 3
 IP_PATTERN = r'^((1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})\.){3}(1[0-9]{2}|2[0-4][0-9]|25[0-5]|[0-9]{1,2})$'
 SERVER_PORT = 1337
-CHUNK_SIZE = 65536
+CHUNK_SIZE = 16384
+
 
 def validate_args():
     '''
@@ -39,6 +46,7 @@ def validate_args():
         print('Try giving an path to a website folder instead.\n')
         return False
     return True
+
 
 def folder_to_json(folder_path):
     '''
@@ -87,22 +95,45 @@ def folder_to_json(folder_path):
             folder_json['entries'].append(folder_to_json(entry_full_path))
     return folder_json
 
+
 def send_data_in_chunks(sock, data, chunk_size):
     '''
     This function sends the given data in chunks of size chunk_size using the given socket.
     '''
-    data_length = len(data)
+    
+    # Encrypt the data
+    encrypted_data = encrypt_data(data)
+    data_length = len(encrypted_data)
     
     print('Data length: %d' % (data_length))
 
     # Run through the data list and jump chunk_size elements every time
-    # Then send the current chunk, until you get to the last chunk and send the rest of the bytes
+    # Stop when you get to the last chunk, then send the rest of the bytes
     for i in range(0, chunk_size * (data_length // chunk_size) + 1, chunk_size):
-        data_to_send = data[i:i + chunk_size]
+        data_to_send = encrypted_data[i:i + chunk_size]
         sock.send(data_to_send)
-        print('Sent: %d' % (len(data_to_send)))
+        print(f"Sent: {len(data_to_send)}")
+
+
+def encrypt_data(data):
+    '''
+    This function uses the Cryptodome.Cipher library to encrypt the given data using the AES algoritm.
+    Note: AES is out dated. The only reason Im using AES is that it's simple for educational purposes.
+    '''
+
+    # Create an instance of a AES object that let's us encrypt our data
+    # key - The encryption key. Random string hard-coded at the top of the code.
+    #       Note: The same key must be used in the decrypting endpoint, and the key's length must be 8.
+    # IV - The initial value for the encryption.
+    #       Note: The same IV must be used in the decrypting endpoint, and the IV's length must be 8.
+    AES_encryptor = AES.new(AES_ENCRYPTION_KEY, AES.MODE_CBC, AES_IV)
+    
+    # Pad the data to be in length of a multiple of the AES_BLOCKSIZE
+    # Encrypt the given data, then return it
+    return AES_encryptor.encrypt(pad(data, AES_BLOCKSIZE))
 
 def main():
+    print("started")
     # Make sure that the format of the arguments is valid
     if not validate_args():
         return None
