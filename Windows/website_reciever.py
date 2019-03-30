@@ -2,11 +2,12 @@ import socket
 import threading
 import pickle
 import os
-from Cryptodome.Cipher import DES 
+from Cryptodome.Cipher import AES
+from Cryptodome.Util.Padding import pad, unpad
 
-DES_ENCRYPTION_KEY = "l$N6Vq6N"
-DES_BLOCKSIZE = 8
-DES_IV = "r&dVM1Z8"
+AES_ENCRYPTION_KEY = b"N44vCTcb<W8sBXD@"
+AES_BLOCKSIZE = 16
+AES_IV = b"PoTFg9ZlV?g(bH8Z"
 
 LISTEN_PORT = 1337
 CHUNK_SIZE = 16384
@@ -28,7 +29,7 @@ def recv_data_in_chunks(sock, total_size, chunk_size):
         data = data + new_data
     
     # Return the decrypted data
-    return decrypt_data(new_data)
+    return decrypt_data(data)
 
 
 def json_to_folder(folder_json, relative_path=''):
@@ -100,7 +101,7 @@ def handle_client(client_socket, client_addr):
         client_socket.send(b'DENIED')
         return None
 
-    print('%s: Recieving and deserializing data...' % (str(client_addr)))
+    print('%s: Recieving and Deserializing data...' % (str(client_addr)))
     
     # Recieve the folder data from the client and decrypt it
     serialized_data = recv_data_in_chunks(client_socket, data_length, CHUNK_SIZE)
@@ -123,19 +124,19 @@ def handle_client(client_socket, client_addr):
 
 def decrypt_data(data):
     '''
-    This function uses the pyDes library to encrypt the given data using the DES algoritm.
-    Note: DES is out dated. The only reason Im using DES is that it's simple for educational purposes.
+    This function uses the Cryptodome.Cipher library to encrypt the given data using the AES algoritm.
+    Note: AES is out dated. The only reason Im using AES is that it's simple for educational purposes.
     '''
 
-    # Create an instance of a DES object that let's us decrypt our data
+    # Create an instance of a AES object that let's us decrypt our data
     # key - The encryption key. Random string hard-coded at the top of the code.
     #       Note: The same key must be used in the encrypting endpoint, and the key's length must be 8.
-    # pad - The padding byte to remove from the end of the data.
-    #       Note: According to the protocol of DES, the length of the data must be a multiple of 8.
-    des_encryptor = pyDes.des(key=DES_ENCRYPTION_KEY, pad=b'\0')
+    # IV - The initial value of the encryption.
+    #       Note: According to the protocol of AES, the length of the IV must be a multiple of 8.
+    aes_encryptor = AES.new(AES_ENCRYPTION_KEY, AES.MODE_CBC, AES_IV)
 
     # Encrypt the given data, then return it
-    return des_encryptor.decrypt(data)
+    return unpad(aes_encryptor.decrypt(data), AES_BLOCKSIZE)
 
 
 def get_my_ip():
