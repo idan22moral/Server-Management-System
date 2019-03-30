@@ -20,16 +20,16 @@ def recv_data_in_chunks(sock, total_size, chunk_size):
     '''
     This function recieves data of size total_size using given socket in chunks of chunk_size.
     '''
-    data = b''
+    full_data = b''
 
     # Recieve the data pieces and join them together
-    while len(data) < total_size:
-        new_data = sock.recv(chunk_size)
-        print(f"Recieved {len(new_data)}")
-        data = data + new_data
+    while len(full_data) < total_size:
+        chunk_data = sock.recv(chunk_size)
+        print(f"Recieved {len(chunk_data)}")
+        full_data = full_data + chunk_data
     
     # Return the decrypted data
-    return decrypt_data(data)
+    return decrypt_data(full_data)
 
 
 def json_to_folder(folder_json, relative_path=''):
