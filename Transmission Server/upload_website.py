@@ -5,6 +5,7 @@ import socket
 import json, pickle
 import zipfile, shutil
 from Cryptodome.Cipher import AES
+from Cryptodome.PublicKey import RSA
 from Cryptodome.Util.Padding import pad
 
 AES_ENCRYPTION_KEY = b"N44vCTcb<W8sBXD@"
