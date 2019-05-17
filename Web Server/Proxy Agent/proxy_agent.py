@@ -3,11 +3,12 @@ Our Proxy-Protocol is based on a simple structure of a packet.
 This agent is a simple implementation of the idea, and it should work on HTTP packets only.
 
 The client sends a request in this format:
-<ip_in_bytes><HTTP_method>...
+<ip_in_bytes><port_in_bytes><HTTP_method>...
 
-For example, if the requesting ip is 56.104.74.10, the request in bytes will be:
-ASCII:  8  h  J  \n H  T  T  P  ...
-HEX:    38 68 4A 0A 48 54 54 50 ...
+For example, if the requesting ip is 56.104.74.10 and the port is 7070, the request in bytes will be:
+       |--------IP--------|---PORT---|---------DATA---------|          
+ASCII:  8    h    J    \n   \x1b \x9e H    T    T    P  ...
+HEX:    38   68   4A   0A   1b   9e   48   54   54   50 ...
 """
 
 
@@ -16,6 +17,9 @@ import re
 
 MAX_PACKET_SIZE = 1024
 IP_REGEX = '(?P<src_address>(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))'
+ENDPOINT_LENGTH = 6  # Length in bytes
+VALID_HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT',
+                      'DELETE', 'TRACE', 'OPTIONS', 'CONNECT', 'PATCH']
 
 
 def get_port(msg, excluded_ports=[]):
@@ -41,7 +45,8 @@ def get_port(msg, excluded_ports=[]):
 
 def main():
     local_server_port = get_port("Local server port: ")
-    listen_port = get_port("Proxy port: ", excluded_ports=[local_server_port])
+    proxy_response_port = get_port("Proxy server port: ")
+    listen_port = get_port("Agent port: ", excluded_ports=[local_server_port])
 
     # Create a listening socket
     with socket.socket() as listen_socket:
@@ -50,33 +55,44 @@ def main():
         listen_socket.listen()
 
         while True:
-            # Accept a client and receive his request
-            client_socket, addr = listen_socket.accept()
-            packet_data = client_socket.recv(MAX_PACKET_SIZE)
+            # Accept a client, receive his request and close the connection
+            proxy_request_socket, proxy_address = listen_socket.accept()
+            packet_data = proxy_request_socket.recv(MAX_PACKET_SIZE)
+            proxy_request_socket.close()
 
             # Make sure that the request starts with an ip
             # The ip is the ip of the client that should be the final destination of the response
-            packet_match = re.match((b'^(.{4})(GET|POST)'), packet_data)
+            # Example of matching request: '8hJ\n\x1b\x9ePOST / HTTP/1.1 ...'
+            packet_match = re.match(f'^(.{{6}})({'|'.join(VALID_HTTP_METHODS)})'.encode(), packet_data)
             if packet_match is not None:
-                # Take the bytes of the ip and save them for the response
-                dst_ip = packet_match[:4]
+                # Take the bytes of the endpoint and save them for the response
+                dst_endpoint = packet_match[:ENDPOINT_LENGTH]
 
-                # Connect to the local server
                 with socket.socket() as local_server_socket:
+                    # Connect to the local server
+                    local_server_socket.connect(("0.0.0.0", local_server_port))
+
                     # Remove the ip from the beginning packet
                     # and send the rest of the packet as a pure HTTP request
-                    local_server_port.send(packet_data[4:])
+                    local_server_socket.send(packet_data[ENDPOINT_LENGTH:])
 
                     # Get the response from the local server
-                    response_data = local_server_port.recv(MAX_PACKET_SIZE)
+                    # This is a time consuming action, it should be done in a thread
+                    response_data = local_server_socket.recv(MAX_PACKET_SIZE)
 
-                    # Send the response to the client
-                    # with the ip that we removed earlier
-                    client_socket.send(dst_ip + response_data)
+                    with socket.socket() as proxy_response_socket:
+                        # Connect to the proxy server
+                        proxy_response_socket.connect(
+                            (proxy_address[0], proxy_response_port))
+
+                        # Send the response to the proxy with
+                        # the ip that we removed earlier
+                        proxy_response_socket.send(
+                            dst_endpoint + response_data)
             else:
                 # The packet is invalid to our proxy protocol
                 # so there's no need to continue the connection with the client
-                client_socket.close()
+                proxy_request_socket.close()
 
 
 if __name__ == "__main__":
