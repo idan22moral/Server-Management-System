@@ -90,9 +90,10 @@ def main():
                         proxy_response_socket.send(
                             dst_endpoint + response_data)
             else:
-                # The packet is invalid to our proxy protocol
-                # so there's no need to continue the connection with the client
-                proxy_request_socket.close()
+                # The packet is invalid to our proxy protocol,
+                # so there's no need to continue the connection with the client.
+				# The socket is already closed, so there's no need to close
+                pass
 
 
 if __name__ == "__main__":
