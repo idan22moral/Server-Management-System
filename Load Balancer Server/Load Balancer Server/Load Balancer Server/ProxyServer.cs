@@ -58,7 +58,7 @@ namespace Load_Balancer_Server
         /// </summary>
         /// <param name="message">The message of the client and his endpoint.</param>
         /// <param name="dstEP">The endpoint that will receive the client's message</param>
-        private void PassClientMessage(ProxyMessage message, IPEndPoint dstEP)
+        public void PassClientMessage(ProxyMessage message, IPEndPoint dstEP)
         {
             // Build the message in our proxy format:
             // <endpoint_bytes><client_message>
@@ -75,7 +75,7 @@ namespace Load_Balancer_Server
         /// Passes the given response message to the endpoint.
         /// </summary>
         /// <param name="response"></param>
-        private void PassResponse(ProxyMessage response)
+        public void PassResponse(ProxyMessage response)
         {
             // Send the response to the client
             Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
@@ -86,7 +86,7 @@ namespace Load_Balancer_Server
         /// Receives a message from one of the clients.
         /// </summary>
         /// <returns>Returns the message that the client send.</returns>
-        private ProxyMessage ReceiveClientMessage()
+        public ProxyMessage ReceiveClientMessage()
         {
             if (!running)
                 throw new Exception("Start the server before trying to receive messages.");
@@ -94,19 +94,18 @@ namespace Load_Balancer_Server
             // Accept a client
             var buffer = new byte[MAX_PACKET_SIZE];
 
-            using (var clientSocket = _tcpClientListener.AcceptSocket())
-            {
-                // Get the message from the client and return it
-                clientSocket.Receive(buffer);
-                return new ProxyMessage((IPEndPoint)clientSocket.RemoteEndPoint, buffer);
-            }
+            var clientSocket = _tcpClientListener.AcceptSocket();
+
+            // Get the message from the client and return it
+            clientSocket.Receive(buffer);
+            return new ProxyMessage((IPEndPoint)clientSocket.RemoteEndPoint, clientSocket, buffer);
         }
 
         /// <summary>
         /// Receives a response for one of the client requests.
         /// </summary>
         /// <returns>A tuple containing the EndPoint of the client, and the response data in bytes.</returns>
-        private ProxyMessage ReceiveResponse()
+        public ProxyMessage ReceiveResponse()
         {
             if (!running)
                 throw new Exception("Start the server before trying to receive messages.");
@@ -126,7 +125,7 @@ namespace Load_Balancer_Server
             // Extract the response data from the response
             var responseData = buffer.Skip(IP_LENGTH_IN_BYTES + PORT_LENGTH_IN_BYTES).ToArray();
 
-            return new ProxyMessage(clientEndpoint, responseData);
+            return new ProxyMessage(clientEndpoint, responseSocket, responseData);
         }
 
         /// <summary>

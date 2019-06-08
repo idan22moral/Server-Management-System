@@ -39,7 +39,7 @@ namespace Load_Balancer_Server
         {
             // Make sure that there are any load carrier
             if (_loadCarrierPairs.Count == 0)
-                throw new Exception("Cannot pick a Load Carrier because there are not any.");
+                throw new InvalidOperationException("Cannot pick a Load Carrier because there are not any.");
 
             var mostAvailable = _loadCarrierPairs.First();
 
@@ -63,6 +63,17 @@ namespace Load_Balancer_Server
             if (_loadCarrierPairs.ContainsKey(newLoadCarrier))
                 throw new Exception("The given load carrier is already in.");
             _loadCarrierPairs[newLoadCarrier] = load;
+        }
+
+        /// <summary>
+        /// Removes the given load carrier to the load balancer.
+        /// </summary>
+        /// <param name="newLoadCarrier">The load carrier to remove</param>
+        public void RemoveLoadCarrier(TLoadCarrier loadCarrier)
+        {
+            if (!_loadCarrierPairs.ContainsKey(loadCarrier))
+                throw new Exception("The given load carrier is does not exist in the load balancer.");
+            _loadCarrierPairs.Remove(loadCarrier);
         }
 
         /// <summary>
