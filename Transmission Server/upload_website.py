@@ -1,11 +1,9 @@
 import sys
 import re
-import os, os
+import os
 import socket
-import json, pickle
-import zipfile, shutil
+import pickle
 from Cryptodome.Cipher import AES
-from Cryptodome.PublicKey import RSA
 from Cryptodome.Util.Padding import pad
 import threading
 import time

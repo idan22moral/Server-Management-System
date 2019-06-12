@@ -3,7 +3,7 @@ import threading
 import pickle
 import os
 from Cryptodome.Cipher import AES
-from Cryptodome.Util.Padding import pad, unpad
+from Cryptodome.Util.Padding import unpad
 import sys
 
 AES_ENCRYPTION_KEY = b"N44vCTcb<W8sBXD@"
