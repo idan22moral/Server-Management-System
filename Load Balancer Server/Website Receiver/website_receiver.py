@@ -4,6 +4,7 @@ import pickle
 import os
 from Cryptodome.Cipher import AES
 from Cryptodome.Util.Padding import pad, unpad
+import sys
 
 AES_ENCRYPTION_KEY = b"N44vCTcb<W8sBXD@"
 AES_BLOCKSIZE = 16
@@ -15,6 +16,7 @@ GOOGLE_DNS_IP = "8.8.8.8"
 DNS_PORT = 53
 
 client_threads = []
+websites_folder = ""
 
 def recv_data_in_chunks(sock, total_size, chunk_size):
     '''
@@ -112,7 +114,7 @@ def handle_client(client_socket, client_addr):
     print('%s: Creating folder...' % (str(client_addr)))
     
     # Save the folder and make sure that it has an unique name
-    while json_to_folder(website_folder_json) == 'RENAME':
+    while json_to_folder(website_folder_json, websites_folder) == 'RENAME':
         client_socket.send(b'RENAME')
         new_name = client_socket.recv(CHUNK_SIZE).decode().split(':')[1]
         website_folder_json['name'] = os.path.basename(new_name)
@@ -153,6 +155,21 @@ def get_my_ip():
     return local_ip
 
 def main():
+    global websites_folder
+    # Get the websites folder from the arguments
+    # Make sure that these's a possible folder given
+    if len(sys.argv) > 1:
+        # if the folder exists
+        if os.path.exists(sys.argv[1]) and os.path.isdir(sys.argv[1]):
+            websites_folder = sys.argv[1]
+            # Make sure that the path ends with a slash
+            if not websites_folder.endswith('\\') and not websites_folder.endswith('/'):
+                websites_folder += "\\"
+        else:
+            print("The given directory does not exist.\nUsing the current directory as the websites folder.")
+    else:
+        print("No directory was given.\nUsing the current directory as the websites folder.")
+
     # Initialize the listening socket and start listening for clients
     listening_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     local_ip_address = get_my_ip()
