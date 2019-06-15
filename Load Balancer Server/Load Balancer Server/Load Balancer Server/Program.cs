@@ -137,8 +137,18 @@ namespace Load_Balancer_Server
 
             lock (_servers)
             {
-                // Remove all the servers that were removed from the configuration file
-                _servers.RemoveWhere((ep) => !serversAfterChange.Contains(ep));
+                // Take all the servers that were removed from the configuration file
+                HashSet<IPEndPoint> removedServers = new HashSet<IPEndPoint>();
+                foreach (IPEndPoint server in _servers)
+                    if(!serversAfterChange.Contains(server))
+                        removedServers.Add(server);
+
+                // Remove those servers from the servers set and from the load balancer
+                foreach (IPEndPoint server in removedServers)
+                {
+                    _servers.Remove(server);
+                    _loadBalancer.RemoveLoadCarrier(server);
+                }
             }
 
             // Return the added servers
