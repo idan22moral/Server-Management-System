@@ -8,7 +8,7 @@ namespace Load_Balancer_Server
     class ProxyServer
     {
         // The maximum length of a packet
-        private const int MAX_PACKET_SIZE = 1024;
+        private const int MAX_PACKET_SIZE = 65536;
         // The amount of bytes that an IP contains
         private const int IP_LENGTH_IN_BYTES = 4;
         // The amount of bytes that an port contains
@@ -68,18 +68,26 @@ namespace Load_Balancer_Server
 
             // Send the proxy-formatted message to the destination
             Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            socket.SendTo(messageToSend, dstEP);
+            try
+            {
+                socket.Connect(dstEP);
+            }
+            catch
+            {
+                throw new Exception("Connection to server failed.");
+            }
+            socket.Send(messageToSend);
         }
 
         /// <summary>
         /// Passes the given response message to the endpoint.
         /// </summary>
         /// <param name="response"></param>
-        public void PassResponse(ProxyMessage response)
+        public void PassResponse(ProxyMessage response, Socket clientSocket)
         {
             // Send the response to the client
-            Socket socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            socket.SendTo(response.Content, response.ClientEndpoint);
+            if(clientSocket != null && clientSocket.Connected)
+                clientSocket.Send(response.Content);
         }
 
         /// <summary>
@@ -115,17 +123,28 @@ namespace Load_Balancer_Server
             var responseSocket = _tcpResponseListener.AcceptSocket();
 
             // Get the message from the server and return it
-            responseSocket.Receive(buffer);
+            try
+            {
+                // Give the server 5 seconds to respond
+                responseSocket.ReceiveTimeout = 1000 * 5;
+                responseSocket.Receive(buffer);
+            }
+            catch (Exception e)
+            {
+                throw new Exception("Response receiving timeout.");
+            }
 
             // Extract the client endpoint from the response
-            var ipBytes = buffer.Take(IP_LENGTH_IN_BYTES).ToArray();
-            var portBytes = buffer.Skip(IP_LENGTH_IN_BYTES).Take(PORT_LENGTH_IN_BYTES).ToArray();
-            var clientEndpoint = new IPEndPoint(BytesToLong(ipBytes), (int)BytesToLong(portBytes));
+            byte[] ipBytes = buffer.Take(IP_LENGTH_IN_BYTES).ToArray();
+            byte[] portBytes = buffer.Skip(IP_LENGTH_IN_BYTES).Take(PORT_LENGTH_IN_BYTES).ToArray();
+            long ipLong = BitConverter.ToInt64(ipBytes.Concat(new byte[] { 0, 0, 0, 0 }).ToArray(), 0);
+            int portInt = BitConverter.ToInt32(portBytes.Concat(new byte[] { 0, 0 }).ToArray(), 0);
+            var clientEndpoint = new IPEndPoint(ipLong, portInt);
 
             // Extract the response data from the response
             var responseData = buffer.Skip(IP_LENGTH_IN_BYTES + PORT_LENGTH_IN_BYTES).ToArray();
 
-            return new ProxyMessage(clientEndpoint, responseSocket, responseData);
+            return new ProxyMessage(clientEndpoint, null, responseData);
         }
 
         /// <summary>

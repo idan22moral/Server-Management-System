@@ -80,7 +80,7 @@ namespace Load_Balancer_Server
         /// Removes 1 load unit from the load of the given load carrier if it exists.
         /// </summary>
         /// <param name="loadCarrier">The load carrier to remove from/param>
-        private void RemoveLoad(TLoadCarrier loadCarrier)
+        public void RemoveLoad(TLoadCarrier loadCarrier)
         {
             if (_loadCarrierPairs.ContainsKey(loadCarrier))
                 _loadCarrierPairs[loadCarrier] -= 1;
@@ -90,10 +90,22 @@ namespace Load_Balancer_Server
         /// Adds 1 load unit to the load of the given load carrier if it exists.
         /// </summary>
         /// <param name="loadCarrier">The load carrier to add to/param>
-        private void AddLoad(TLoadCarrier loadCarrier)
+        public void AddLoad(TLoadCarrier loadCarrier)
         {
             if (_loadCarrierPairs.ContainsKey(loadCarrier))
                 _loadCarrierPairs[loadCarrier] += 1;
+        }
+
+        /// <summary>
+        /// Returns the amount of load on the given load carrier
+        /// </summary>
+        /// <returns>The load on the given load carrier</returns>
+        public int GetLoad(TLoadCarrier loadCarrier)
+        {
+            if (_loadCarrierPairs.ContainsKey(loadCarrier))
+                return _loadCarrierPairs[loadCarrier];
+            else
+                throw new Exception("The given load carrier is does not exist in the load balancer.");
         }
     }
 }

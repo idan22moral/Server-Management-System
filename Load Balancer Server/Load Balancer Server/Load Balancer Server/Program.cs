@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Net.Sockets;
 
 namespace Load_Balancer_Server
 {
@@ -11,10 +13,12 @@ namespace Load_Balancer_Server
     {
         static HashSet<IPEndPoint> _servers = new HashSet<IPEndPoint>();
         static LoadBalancer<IPEndPoint> _loadBalancer = new LoadBalancer<IPEndPoint>(_servers);
+        static Dictionary<IPEndPoint, Socket> _clients = new Dictionary<IPEndPoint, Socket>();
         const string SERVER_REGEX = @"(?<ip>(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)):(?<port>\d+)";
         const string SERVERS_FILE = "servers.cfg";
         const int SERVE_PORT = 80;
         const int PROXY_PORT = 7070;
+        const int SECOND = 1000;
 
         static void Main(string[] args)
         {
@@ -24,7 +28,7 @@ namespace Load_Balancer_Server
                 while (true)
                 {
                     HashSet<IPEndPoint> addedServers = LoadServers(SERVERS_FILE);
-                    Console.WriteLine("Reloading servers...");
+                    //Console.WriteLine("Reloading servers...");
 
                     // Add the new servers to the Load Balancer
                     foreach (var server in addedServers)
@@ -34,12 +38,23 @@ namespace Load_Balancer_Server
                             _loadBalancer.AddLoadCarrier(server);
                         }
                     }
-                    
+
                     // Sleep for ten Seconds
-                    Thread.Sleep(10 * 1000);
+                    Thread.Sleep(SECOND);
                 }
             });
             serverLoadingThread.Start();
+
+            // Start the status-printing thread
+            Thread statusPrintingThread = new Thread(() =>
+            {
+                while (true)
+                {
+                    PrintLoadBalancingStatus();
+                    Thread.Sleep(100);
+                }
+            });
+            statusPrintingThread.Start();
 
             // Set-up the server and start listening for client-requests and server-responses
             ProxyServer proxyServer = new ProxyServer(SERVE_PORT, PROXY_PORT);
@@ -49,35 +64,67 @@ namespace Load_Balancer_Server
             {
                 // Get request from client
                 ProxyMessage clientRequest = proxyServer.ReceiveClientMessage();
-
+                _clients[clientRequest.ClientEndpoint] = clientRequest.Socket;
+                //ColorizedWriteLine($"REQUEST from {clientRequest.ClientEndpoint}", ConsoleColor.Green);
+                
                 // Pick the most available server
                 IPEndPoint handlingServer;
                 lock (_loadBalancer)
                 {
+                    //Console.WriteLine("Picking Web Server...");
                     handlingServer = _loadBalancer.PickMostAvailableCarrier();
+                    //Console.WriteLine($"Picked {handlingServer}");
                 }
-
-                // Pass the request of the client to the server
-                lock (proxyServer)
+                
+                try
                 {
+                    // Pass the request of the client to the server
+                    //Console.WriteLine($"Passing Client Request to {handlingServer}");
                     proxyServer.PassClientMessage(clientRequest, handlingServer);
+                    // Add the load to the handling server
+                    _loadBalancer.AddLoad(handlingServer);
+                }
+                catch // There's a problem with the web server
+                {
+                    // Send the client an error message
+                    byte[] problemResponseData = Encoding.ASCII.GetBytes("HTTP/1.1 500 Internal Server Error");
+                    var clientEP = clientRequest.ClientEndpoint;
+                    proxyServer.PassResponse(new ProxyMessage(clientEP, null, problemResponseData), clientRequest.Socket);
+
+                    // Remove the load from the handling server
+                    _loadBalancer.RemoveLoad(handlingServer);
+                    
+                    // Notify in the console that the web server has a problem
+                    ColorizedWriteLine($"Web Server {handlingServer} has a problem! (2)", ConsoleColor.Red);
+                    continue;
                 }
 
-                // Queue a thread for handling the server's response
+                // Queue a thread for handling the request
                 ThreadPool.QueueUserWorkItem((obj) =>
                 {
-                    ProxyMessage serverResponse;
-                    lock (proxyServer)
+                    try
                     {
                         // Get the response for the client form the server
-                        serverResponse = proxyServer.ReceiveResponse();
+                        ProxyMessage serverResponse = proxyServer.ReceiveResponse();
+                        
+                        // Pass the response to the client
+                        proxyServer.PassResponse(serverResponse, _clients[serverResponse.ClientEndpoint]);
+                        _clients.Remove(serverResponse.ClientEndpoint);
+                        //ColorizedWriteLine($"RESPONSE to {clientRequest.ClientEndpoint}", ConsoleColor.Blue);
+                    }
+                    catch (Exception e)
+                    {
+                        // Send the client an error message
+                        byte[] problemResponseData = Encoding.ASCII.GetBytes("HTTP/1.1 500 Internal Server Error");
+                        var clientEP = clientRequest.ClientEndpoint;
+                        proxyServer.PassResponse(new ProxyMessage(clientEP, null, problemResponseData), clientRequest.Socket);
+
+                        // Notify in the console that the web server has a problem
+                        ColorizedWriteLine($"Web Server {handlingServer} has a problem!\n", ConsoleColor.Red);
                     }
 
-                    lock (proxyServer)
-                    {
-                        // Pass the response to the client
-                        proxyServer.PassResponse(serverResponse);
-                    }
+                    // Remove the load from the handling server
+                    _loadBalancer.RemoveLoad(handlingServer);
                 });
             }
         }
@@ -140,7 +187,7 @@ namespace Load_Balancer_Server
                 // Take all the servers that were removed from the configuration file
                 HashSet<IPEndPoint> removedServers = new HashSet<IPEndPoint>();
                 foreach (IPEndPoint server in _servers)
-                    if(!serversAfterChange.Contains(server))
+                    if (!serversAfterChange.Contains(server))
                         removedServers.Add(server);
 
                 // Remove those servers from the servers set and from the load balancer
@@ -163,6 +210,34 @@ namespace Load_Balancer_Server
         static bool IsValidPort(int port)
         {
             return port >= 0 && port <= 65535;
+        }
+
+        /// <summary>
+        /// Prints the given text to the console with the given color.
+        /// </summary>
+        /// <param name="text">The text to print.</param>
+        /// <param name="color">The color to print in.</param>
+        static void ColorizedWriteLine(string text, ConsoleColor color)
+        {
+            lock (Console.Out)
+            {
+                var previousColor = Console.ForegroundColor;
+                Console.ForegroundColor = color;
+                Console.WriteLine(text);
+                Console.ForegroundColor = previousColor;
+            }
+        }
+
+        static void PrintLoadBalancingStatus()
+        {
+            Console.Clear();
+
+            Console.WriteLine($"Servers [{_servers.Count}]:");
+            Console.WriteLine("\tIP\t\tPort\tLoad");
+            foreach (var server in _servers)
+            {
+                Console.WriteLine($"\t{server.Address}\t{server.Port}\t{_loadBalancer.GetLoad(server)}");
+            }
         }
     }
 }
