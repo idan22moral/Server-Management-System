@@ -108,7 +108,7 @@ def main():
             # Make sure that the request starts with an ip
             # The ip is the ip of the client that should be the final destination of the response
             # Example of matching request: '8hJ\n\x1b\x9ePOST / HTTP/1.1 ...'
-            packet_match = re.match(f'^(.{{6}})({"|".join(VALID_HTTP_METHODS)})'.encode(), packet_data)
+            packet_match = re.match(f'^([\s\S]{{6}})({"|".join(VALID_HTTP_METHODS)})'.encode(), packet_data)
             if packet_match is not None:
                 # Take the bytes of the endpoint and save them for the response
                 dst_endpoint = packet_match.group(1)
