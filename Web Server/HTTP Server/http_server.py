@@ -112,8 +112,15 @@ def handle_client_request(client_socket, method, resource):
     # rfind returns the index of the last appriance of the given substring
     resource_type = resource[resource.rfind('.') + 1:]
 
-    # Check if the requested file (resource) exists
-    if not os.path.isfile(resource):
+    # Check if the resource is safe (no "/.." in it), and the requested file (resource) exists
+    if "/.." in resource or "\\.." in resource:
+        # Requested resouce is unsafe
+        logger.warning('!!! UNSAFE REQUEST !!!')
+        status_code = 400
+        phrase = 'Bad Request'
+        headers = ''
+        body = '<h1>Error 400 Bad Request.</h1>'
+    elif not os.path.isfile(resource):
         # Resource not found, send code 404
         logger.warning('404 ' + resource.split(webroot_path)
                        [-1] + ' Not Found')
