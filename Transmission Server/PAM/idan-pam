@@ -1,0 +1,48 @@
+## 
+# This section deals with blocking the user for 5 minutes if he was unsuccessful to login 3 times 
+#  
+# Using pam_tally.so module 
+auth		required      pam_tally2.so deny=3 unlock_time=300
+# Using pam_tally for account for reseting the counter after a successful login 
+account		required      pam_tally2.so
+# 
+
+## Standard unix password authorization
+auth            required      pam_unix.so
+
+##
+# The app will be activated only if the user is in a file of authorized users.
+#
+# Using pam_listfile module and specifying flags accordingly. File is located on /etc/loginusers and contains names of authorized users
+ 
+auth		required      pam_listfile.so onerr=fail item=user sense=allow file=/etc/security/loginusers
+
+##                                       
+# Checking account compliance 
+#
+# Using pam_unix module as a standard account verification
+account         required      pam_unix.so
+
+##
+# Activation will be between 08:00 and 21:00
+#
+# Using the pam_time module in order to define for all the users that activation will be in a specific time.
+# In addition, /etc/security/time.conf file should be updated with the following line:
+# * ; * ; * ; Al0800-2100
+# Meaning that activation will be allowed for all users from all ttys on every day of the week only between 21:00 - 24:00
+
+account         required      pam_time.so
+
+# Standard session pam unix module 
+session	        required      pam_unix.so
+
+##
+# Check user password quality 
+# 
+# The following pam modules deals with checking the user password quality
+# pam_pwquality - the main module in which password quality is checked (3 retries are possible)
+# if pam_pwquality fails, the new password verification sequence fails and 2nd module is not activated (requisite)
+# if succeeded, using standard pam_unix module in order to continue processing the new password(getting it with the use_authok).
+# continue validating it with 'obscure' flag 
+password        requisite     pam_pwquality.so retry=3
+password        required      pam_unix.so obscure use_authtok try_first_pass sha512
