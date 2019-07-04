@@ -80,6 +80,8 @@ def folder_to_json(folder_path):
             ] 
         }
     '''
+    
+    print(folder_path)
 
     # Make sure that the folder path is in valid format
     folder_path = os.path.abspath(folder_path)
@@ -204,9 +206,10 @@ def main():
                     new_websites.append(website)
             
             # For each new website
+            print(new_websites)
             for new_website in new_websites:
                 # Upload the new website to the target(s)
-                threading.Thread(target=upload_website, args=(f"{websites_folder_path}\{new_website}",)).start()
+                threading.Thread(target=upload_website, args=(f"{websites_folder_path}{new_website}",)).start()
                 # Add the new website to the list of websites
                 websites.append(new_website)
         
